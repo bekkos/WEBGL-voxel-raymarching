@@ -18,28 +18,43 @@ exports.FragmentShader = `
   uniform sampler2D u_voxelTexture;
   uniform int u_numVoxels;
 
-  
+
   // Constants
   #define PI 3.1415925359
   #define TWO_PI 6.2831852
-  #define MAX_STEPS 100
-  #define MAX_DIST 100.
+  #define MAX_STEPS 500
+  #define MAX_DIST 500.
   #define SURFACE_DIST .01
-   
+  
 
   float voxelDistance(vec3 p, vec3 v) {
-    return length(max(abs(p)-v, 0.));
+    vec3 q = abs(p) - v;
+    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
   }
-  float GetDist(vec3 p)
-  {
-      float closest = MAX_DIST * 2.;
-      vec4 voxelData = texture2D(u_voxelTexture, vec2(1.0, 0.5));
-      float vd = voxelDistance(p, vec3(voxelData.a));
-      closest = min(vd, closest);
-      float planeDist = p.y;
-      float d = min(closest,planeDist);
-   
-      return d;
+
+  float GetDist(vec3 p) {
+    float closest = MAX_DIST * 2.;
+    float closestIndex = -1.;
+
+    for (float i = 0.0; i < 2.; i++) {
+        // Sample voxel position from the texture
+        vec4 voxelData = texture2D(u_voxelTexture, vec2(i, 0.5));
+
+        // Quantize voxel position to the grid and scale appropriately
+        vec3 voxelPos = voxelData.xyz * 2.0 - 1.0; // Assuming voxel positions are in the range [0, 1]
+        voxelPos *= vec3(100.0, 100.0, 100.0); // Adjust the scale as needed
+
+        float vd = voxelDistance(p - voxelPos, vec3(0.5)); // Adjust the voxel size as needed
+        if (closest > vd) {
+            closestIndex = i;
+        }
+        closest = min(vd, closest);
+    }
+
+    float planeDist = p.y;
+    float d = min(closest, planeDist);
+
+    return d;
   }
 
   float RayMarch(vec3 ro, vec3 rd) 
@@ -54,17 +69,41 @@ exports.FragmentShader = `
       }
       return dO;
   }
-   
+
+  vec3 GetNormal(vec3 p) {
+    float d = GetDist(p);
+      vec2 e = vec2(.01, 0);
+      
+      vec3 n = d - vec3(
+          GetDist(p-e.xyy),
+          GetDist(p-e.yxy),
+          GetDist(p-e.yyx));
+      
+      return normalize(n);
+  }
+
+  float GetLight(vec3 p) {
+    vec3 lightPos = vec3(0, 5, 6);
+    vec3 l = normalize(lightPos-p);
+    vec3 n = GetNormal(p);
+    
+    float dif = clamp(dot(n, l), 0., 1.);
+    float d = RayMarch(p+n*SURFACE_DIST*2., l);
+    if(d<length(lightPos-p)) dif *= .1;
+    
+    return dif;
+}
+  
   void main()
   {
       vec2 uv = (gl_FragCoord.xy-.5*canvasSize.xy)/canvasSize.y;
       vec3 ro = vec3(playerPos.x,playerPos.y,playerPos.z); // Ray Origin/ Camera
       vec3 rd = normalize(vec3(uv.x,uv.y,1));
       float d = RayMarch(ro,rd); // Distance
-      d/= 10.;
-      vec3 color = vec3(d);
-       
-      // Set the output color
+      vec3 p = ro + rd * d;
+
+      float dif = GetLight(p);
+      vec3 color = vec3(dif);
       gl_FragColor = vec4(color,1.0);
   }
 `;

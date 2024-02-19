@@ -11,8 +11,8 @@ var PLAYER = {
   speed: 0.02,
 };
 var VOXEL_DATA = [
-  [1.0, 1.0, 6.0, 5],
-  [1.0, -6.0, 6.0, 1],
+  0.5, 0.5, 0.5, 0.0,
+  1.0, 2.0, 1.0, 1.0
 ];
 
 function init() {
@@ -64,7 +64,7 @@ function update(gl: WebGLRenderingContext, programInfo: IProgramInfo) {
     PLAYER.position[2],
   );
 
-  const flatVoxelData = new Uint8Array(VOXEL_DATA.flat());
+  const flatVoxelData = new Uint8Array(VOXEL_DATA);
   const voxelTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, voxelTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, VOXEL_DATA.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, flatVoxelData);
@@ -83,6 +83,7 @@ function update(gl: WebGLRenderingContext, programInfo: IProgramInfo) {
 }
 
 function loop(gl: WebGLRenderingContext, programInfo: IProgramInfo, buffers: any) {
+  gl.useProgram(programInfo.program);
   var timeNow = new Date().getTime();
   gl.uniform1f(gl.getUniformLocation(programInfo.program, 'timeSec'), (timeNow - START_TIME) / 1000);
   update(gl, programInfo);
